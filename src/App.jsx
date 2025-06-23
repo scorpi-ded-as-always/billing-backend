@@ -1,31 +1,35 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import ProductForm from "./components/ProductForm";
-import BillForm from "./components/BillForm";
-import BillList from "./components/BillList";
-import Login from "./pages/Login";
+import React, { useEffect, useState } from "react";
 
-function App() {
+const API_BASE = "https://your-backend.onrender.com"; // 🔁 Replace this
+
+const App = () => {
+  const [products, setProducts] = useState([]);
+
+  // Fetch products from backend
+  useEffect(() => {
+    fetch(`${API_BASE}/products`)
+      .then((res) => res.json())
+      .then((data) => setProducts(data))
+      .catch((err) => console.error("Error fetching products:", err));
+  }, []);
+
   return (
-    <Router>
-      <div className="container">
-        <h1>🧾 Billing & Stock Management</h1>
-
-        <nav>
-          <Link to="/">🏠 Bills</Link> |{" "}
-          <Link to="/products">📦 Products</Link> |{" "}
-          <Link to="/create">➕ Create Bill</Link>
-        </nav>
-
-        <Routes>
-          <Route path="/" element={<BillList />} />
-          <Route path="/products" element={<ProductForm />} />
-          <Route path="/create" element={<BillForm />} />
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </div>
-    </Router>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">🧾 Billing System</h1>
+      <h2 className="text-xl mb-2">Available Products</h2>
+      <ul className="list-disc pl-5">
+        {products.length > 0 ? (
+          products.map((p) => (
+            <li key={p.id}>
+              {p.name} - ₹{p.price} (Stock: {p.stock})
+            </li>
+          ))
+        ) : (
+          <p>No products found.</p>
+        )}
+      </ul>
+    </div>
   );
-}
+};
 
 export default App;
