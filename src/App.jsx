@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-const API_BASE = "https://your-backend.onrender.com"; // 🔁 Replace this
+const API_BASE = "https://billing-frontend-nk45.onrender.com/"; // 🔁 Replace this
 
 const App = () => {
   const [products, setProducts] = useState([]);
