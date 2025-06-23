@@ -1,125 +1,156 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 
-const BillForm = () => {
+const API_BASE = "https://billing-frontend-nk45.onrender.com/"; // 🔁 Replace this
+
+const BillForm = ({ onBillAdded }) => {
   const [products, setProducts] = useState([]);
-  const [items, setItems] = useState([]);
-  const [gst, setGst] = useState(18);
+  const [billItems, setBillItems] = useState([]);
+  const [gst, setGst] = useState(0);
   const [discount, setDiscount] = useState(0);
-  const token = "Bearer MOCK_TOKEN";
 
   useEffect(() => {
-    fetch("http://localhost:3000/products")
+    fetch(`${API_BASE}/products`)
       .then((res) => res.json())
       .then(setProducts);
   }, []);
 
-  const addItem = (product) => {
-    const existing = items.find((i) => i.id === product.id);
-    if (existing) {
-      existing.quantity += 1;
-      setItems([...items]);
-    } else {
-      setItems([...items, { ...product, quantity: 1 }]);
+  const addItem = () => {
+    setBillItems([...billItems, { productId: "", quantity: 1, price: 0 }]);
+  };
+
+  const updateItem = (index, field, value) => {
+    const updatedItems = [...billItems];
+    updatedItems[index][field] = field === "quantity" ? parseInt(value) : value;
+
+    // Auto update price based on selected product
+    if (field === "productId") {
+      const product = products.find((p) => p.id === value);
+      if (product) updatedItems[index].price = product.price;
     }
+
+    setBillItems(updatedItems);
   };
 
-  const updateQty = (id, qty) => {
-    setItems(
-      items.map((i) => (i.id === id ? { ...i, quantity: Number(qty) } : i))
+  const calculateTotal = () => {
+    const subtotal = billItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
     );
-  };
-
-  const removeItem = (id) => {
-    setItems(items.filter((i) => i.id !== id));
+    const gstAmount = (subtotal * gst) / 100;
+    const discountAmount = (subtotal * discount) / 100;
+    return subtotal + gstAmount - discountAmount;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const res = await fetch("http://localhost:3000/bills", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: token,
-      },
-      body: JSON.stringify({ items, gst, discount }),
-    });
+    const total = billItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+    const finalAmount = calculateTotal();
 
-    const data = await res.json();
-    alert("Bill Created ✅");
-    setItems([]);
+    const bill = {
+      id: Date.now().toString(),
+      items: billItems,
+      total,
+      gst,
+      discount,
+      finalAmount,
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/bills`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bill),
+      });
+
+      if (res.ok) {
+        alert("Bill created!");
+        setBillItems([]);
+        setGst(0);
+        setDiscount(0);
+        if (onBillAdded) onBillAdded();
+      } else {
+        alert("Error creating bill");
+      }
+    } catch (err) {
+      console.error("Error:", err);
+    }
   };
 
-  const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const gstAmt = (subtotal * gst) / 100;
-  const discountAmt = (subtotal * discount) / 100;
-  const total = subtotal + gstAmt - discountAmt;
-
   return (
-    <div>
-      <h2>➕ Create Bill</h2>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h2 className="text-lg font-bold">🧾 Create Bill</h2>
 
-      <div>
-        <label>GST %: </label>
+      {billItems.map((item, idx) => (
+        <div key={idx} className="flex gap-2">
+          <select
+            value={item.productId}
+            onChange={(e) => updateItem(idx, "productId", e.target.value)}
+            className="border p-2 w-1/3"
+            required
+          >
+            <option value="">Select product</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            value={item.quantity}
+            onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+            className="border p-2 w-1/3"
+            placeholder="Qty"
+            min="1"
+            required
+          />
+          <input
+            type="number"
+            value={item.price}
+            readOnly
+            className="border p-2 w-1/3"
+            placeholder="Price"
+          />
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={addItem}
+        className="bg-green-600 text-white px-3 py-1 rounded"
+      >
+        ➕ Add Item
+      </button>
+
+      <div className="flex gap-4">
         <input
           type="number"
+          placeholder="GST %"
           value={gst}
           onChange={(e) => setGst(Number(e.target.value))}
+          className="border p-2 w-1/2"
         />
-        &nbsp;&nbsp;
-        <label>Discount %: </label>
         <input
           type="number"
+          placeholder="Discount %"
           value={discount}
           onChange={(e) => setDiscount(Number(e.target.value))}
+          className="border p-2 w-1/2"
         />
       </div>
 
-      <h3>📦 Available Products</h3>
-      <ul>
-        {products.map((p) => (
-          <li key={p.id}>
-            {p.name} - ₹{p.price} ({p.quantity} in stock)
-            <button onClick={() => addItem(p)}>➕ Add</button>
-          </li>
-        ))}
-      </ul>
+      <p className="font-bold">💰 Final Amount: ₹{calculateTotal().toFixed(2)}</p>
 
-      <h3>🛒 Bill Items</h3>
-      <table border="1" cellPadding="6">
-        <thead>
-          <tr>
-            <th>Name</th><th>Qty</th><th>Price</th><th>Total</th><th>Remove</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((i) => (
-            <tr key={i.id}>
-              <td>{i.name}</td>
-              <td>
-                <input
-                  type="number"
-                  value={i.quantity}
-                  min={1}
-                  onChange={(e) => updateQty(i.id, e.target.value)}
-                />
-              </td>
-              <td>₹{i.price}</td>
-              <td>₹{(i.price * i.quantity).toFixed(2)}</td>
-              <td><button onClick={() => removeItem(i.id)}>❌</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h4>Subtotal: ₹{subtotal.toFixed(2)}</h4>
-      <h4>GST ({gst}%): ₹{gstAmt.toFixed(2)}</h4>
-      <h4>Discount ({discount}%): -₹{discountAmt.toFixed(2)}</h4>
-      <h2>Total: ₹{total.toFixed(2)}</h2>
-
-      <button onClick={handleSubmit} disabled={items.length === 0}>
-        🧾 Submit Bill
+      <button
+        type="submit"
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+      >
+        ✅ Save Bill
       </button>
-    </div>
+    </form>
   );
 };
 
