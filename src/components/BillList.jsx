@@ -1,33 +1,26 @@
 import React, { useEffect, useState } from "react";
 
+const API_BASE = "https://billing-frontend-nk45.onrender.com/"; // 🔁 Replace this
+
 const BillList = () => {
   const [bills, setBills] = useState([]);
-  const [search, setSearch] = useState("");
-  const token = "Bearer MOCK_TOKEN";
-
-  const fetchBills = async () => {
-    const res = await fetch(`http://localhost:3000/bills?product=${search}`, {
-      headers: { Authorization: token },
-    });
-    const data = await res.json();
-    setBills(data.data || []);
-  };
+  const [products, setProducts] = useState([]);
 
   useEffect(() => {
-    fetchBills();
-  }, [search]);
+    fetch(`${API_BASE}/bills`)
+      .then((res) => res.json())
+      .then(setBills);
 
-  const printBill = (id) => {
-    window.open(`http://localhost:3000/print-bill/${id}`, "_blank");
-  };
+    fetch(`${API_BASE}/products`)
+      .then((res) => res.json())
+      .then(setProducts);
+  }, []);
 
   const downloadPDF = (billId) => {
-    fetch(`http://localhost:3000/download-pdf/${billId}`, {
-      headers: { Authorization: token },
-    })
+    fetch(`${API_BASE}/download-pdf/${billId}`)
       .then((res) => res.blob())
       .then((blob) => {
-        const url = window.URL.createObjectURL(new Blob([blob]));
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
         link.setAttribute("download", `invoice-${billId}.pdf`);
@@ -37,48 +30,49 @@ const BillList = () => {
       });
   };
 
+  const getProductName = (id) => {
+    const product = products.find((p) => p.id === id);
+    return product ? product.name : "Unknown";
+  };
+
   return (
-    <div>
-      <h2>🧾 All Bills</h2>
-
-      <input
-        placeholder="Search by product name"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ marginBottom: "10px", padding: "5px" }}
-      />
-
-      <table border="1" cellPadding="6" width="100%">
-        <thead>
-          <tr>
-            <th>Bill ID</th>
-            <th>Date</th>
-            <th>Items</th>
-            <th>Total</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="mt-8">
+      <h2 className="text-lg font-bold mb-2">📋 Previous Bills</h2>
+      {bills.length === 0 ? (
+        <p>No bills found.</p>
+      ) : (
+        <div className="space-y-4">
           {bills.map((bill) => (
-            <tr key={bill.id}>
-              <td>{bill.id}</td>
-              <td>{new Date(bill.date).toLocaleString()}</td>
-              <td>
-                {bill.items.map((i) => (
-                  <div key={i.id}>
-                    {i.name} x{i.quantity}
-                  </div>
+            <div
+              key={bill.id}
+              className="border border-gray-300 rounded p-4 shadow"
+            >
+              <p className="font-semibold">🧾 Bill ID: {bill.id}</p>
+              <ul className="list-disc pl-5">
+                {bill.items.map((item, idx) => (
+                  <li key={idx}>
+                    {getProductName(item.productId)} - Qty: {item.quantity} - ₹
+                    {item.price}
+                  </li>
                 ))}
-              </td>
-              <td>₹{bill.total.toFixed(2)}</td>
-              <td>
-                <button onClick={() => printBill(bill.id)}>🖨️ Print</button>
-                <button onClick={() => downloadPDF(bill.id)}>📥 PDF</button>
-              </td>
-            </tr>
+              </ul>
+              <p>Total: ₹{bill.total}</p>
+              {bill.gst > 0 && <p>GST: ₹{(bill.total * bill.gst) / 100}</p>}
+              {bill.discount > 0 && (
+                <p>Discount: ₹{(bill.total * bill.discount) / 100}</p>
+              )}
+              <p className="font-bold">Final Amount: ₹{bill.finalAmount}</p>
+
+              <button
+                className="mt-2 bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
+                onClick={() => downloadPDF(bill.id)}
+              >
+                📥 Download PDF
+              </button>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 };
